@@ -15,6 +15,8 @@ struct ContentView: View {
     }
 }
 
+/// 将 UIKit 根控制器接入 SwiftUI 生命周期。
+/// 业务页面仍全部使用 UIKit，避免在页面层混用两套布局体系。
 private struct RootViewControllerRepresentable: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         AppContainer.shared.makeRootViewController()
@@ -22,4 +24,3 @@ private struct RootViewControllerRepresentable: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
 }
-

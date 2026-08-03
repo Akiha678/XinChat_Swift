@@ -1,5 +1,6 @@
 import UIKit
 
+/// 应用主导航容器，为消息、联系人和个人中心分别维护独立导航栈。
 final class RootTabBarController: UITabBarController {
     private let repository: ChatRepositoryProtocol
 
@@ -9,6 +10,8 @@ final class RootTabBarController: UITabBarController {
     }
 
     required init?(coder: NSCoder) { nil }
+
+    // MARK: - Lifecycle
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -31,6 +34,9 @@ final class RootTabBarController: UITabBarController {
         ]
     }
 
+    // MARK: - Navigation Factory
+
+    /// 为 Tab 创建独立导航控制器，确保不同模块的页面栈互不影响。
     private func navigationController(
         root: UIViewController,
         title: String,

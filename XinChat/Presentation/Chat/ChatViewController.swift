@@ -1,6 +1,8 @@
 import SnapKit
 import UIKit
 
+/// 单聊详情页面，展示消息气泡并提供本地发送交互。
+/// 当前消息仅保存在内存中，后续可通过 ViewModel 接入即时通信服务。
 final class ChatViewController: UIViewController {
     private let conversation: Conversation
     private let tableView = UITableView(frame: .zero, style: .plain)
@@ -20,12 +22,16 @@ final class ChatViewController: UIViewController {
 
     required init?(coder: NSCoder) { nil }
 
+    // MARK: - Lifecycle
+
     override func viewDidLoad() {
         super.viewDidLoad()
         title = conversation.name
         navigationItem.largeTitleDisplayMode = .never
         setupUI()
     }
+
+    // MARK: - Layout
 
     private func setupUI() {
         view.backgroundColor = AppTheme.background
@@ -71,6 +77,8 @@ final class ChatViewController: UIViewController {
         }
     }
 
+    // MARK: - Actions
+
     @objc private func sendTapped() {
         guard let text = textField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return }
         messages.append(ChatMessage(id: UUID(), text: text, isOutgoing: true, time: "刚刚"))
@@ -79,6 +87,8 @@ final class ChatViewController: UIViewController {
         tableView.scrollToRow(at: IndexPath(row: messages.count - 1, section: 0), at: .bottom, animated: true)
     }
 }
+
+// MARK: - UITableViewDataSource
 
 extension ChatViewController: UITableViewDataSource {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { messages.count }
@@ -90,6 +100,7 @@ extension ChatViewController: UITableViewDataSource {
     }
 }
 
+/// 根据消息方向切换对齐方式与气泡颜色的聊天消息单元格。
 private final class ChatMessageCell: UITableViewCell {
     static let reuseIdentifier = "ChatMessageCell"
     private let bubbleView = UIView()
@@ -118,6 +129,7 @@ private final class ChatMessageCell: UITableViewCell {
 
     required init?(coder: NSCoder) { nil }
 
+    /// 更新气泡内容，并激活与消息方向对应的水平约束。
     func configure(message: ChatMessage) {
         messageLabel.text = message.text
         bubbleView.backgroundColor = message.isOutgoing ? AppTheme.tint : .systemBackground

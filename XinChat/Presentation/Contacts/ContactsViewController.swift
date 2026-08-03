@@ -1,6 +1,7 @@
 import SnapKit
 import UIKit
 
+/// 联系人页面，支持远端加载、下拉刷新、失败重试以及发起聊天。
 final class ContactsViewController: UIViewController {
     private let viewModel: ContactsViewModel
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
@@ -15,12 +16,16 @@ final class ContactsViewController: UIViewController {
 
     required init?(coder: NSCoder) { nil }
 
+    // MARK: - Lifecycle
+
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
         bind()
         viewModel.load()
     }
+
+    // MARK: - Setup & Binding
 
     private func setupUI() {
         view.backgroundColor = AppTheme.background
@@ -51,6 +56,9 @@ final class ContactsViewController: UIViewController {
         viewModel.onStateChanged = { [weak self] state in self?.render(state) }
     }
 
+    // MARK: - Rendering
+
+    /// 根据 ViewModel 状态切换加载、内容或错误视图。
     private func render(_ state: ContactsViewModel.State) {
         tableView.refreshControl?.endRefreshing()
         switch state {
@@ -71,8 +79,12 @@ final class ContactsViewController: UIViewController {
         }
     }
 
+    // MARK: - Actions
+
     @objc private func refresh() { viewModel.load() }
 }
+
+// MARK: - UITableViewDataSource & UITableViewDelegate
 
 extension ContactsViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { contacts.count }
@@ -90,6 +102,7 @@ extension ContactsViewController: UITableViewDataSource, UITableViewDelegate {
             id: UUID(), name: contact.name, preview: "开始新的聊天", time: "现在", unreadCount: 0, colorSeed: contact.id
         )
         let chatViewController = ChatViewController(conversation: conversation)
+        // 与消息列表入口保持一致，聊天详情不展示底部 TabBar。
         chatViewController.hidesBottomBarWhenPushed = true
         navigationController?.pushViewController(chatViewController, animated: true)
     }

@@ -1,6 +1,7 @@
 import SnapKit
 import UIKit
 
+/// 个人中心基础页面，展示用户资料和常用功能入口。
 final class ProfileViewController: UIViewController {
     private let scrollView = UIScrollView()
     private let contentView = UIView()
@@ -10,10 +11,14 @@ final class ProfileViewController: UIViewController {
     private let accountLabel = UILabel()
     private let menuStack = UIStackView()
 
+    // MARK: - Lifecycle
+
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
     }
+
+    // MARK: - Layout
 
     private func setupUI() {
         view.backgroundColor = AppTheme.background
@@ -74,6 +79,7 @@ final class ProfileViewController: UIViewController {
         }
     }
 
+    /// 创建样式统一的个人中心菜单行。
     private func makeMenuRow(icon: String, title: String, color: UIColor) -> UIView {
         let row = UIView()
         row.backgroundColor = .systemBackground

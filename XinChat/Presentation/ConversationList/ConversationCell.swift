@@ -1,6 +1,7 @@
 import SnapKit
 import UIKit
 
+/// 会话列表单元格，展示头像、名称、最近消息、时间和未读数。
 final class ConversationCell: UITableViewCell {
     static let reuseIdentifier = "ConversationCell"
 
@@ -17,6 +18,8 @@ final class ConversationCell: UITableViewCell {
     }
 
     required init?(coder: NSCoder) { nil }
+
+    // MARK: - Layout
 
     private func setupUI() {
         backgroundColor = .systemBackground
@@ -67,6 +70,9 @@ final class ConversationCell: UITableViewCell {
         }
     }
 
+    // MARK: - Configuration
+
+    /// 使用会话展示模型更新单元格。
     func configure(with conversation: Conversation) {
         avatarView.configure(name: conversation.name, seed: conversation.colorSeed)
         nameLabel.text = conversation.name

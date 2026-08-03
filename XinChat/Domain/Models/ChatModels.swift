@@ -1,5 +1,6 @@
 import Foundation
 
+/// 服务端联系人模型。
 struct Contact: Decodable, Hashable {
     let id: Int
     let name: String
@@ -7,6 +8,7 @@ struct Contact: Decodable, Hashable {
     let email: String
 }
 
+/// 会话列表展示模型。
 struct Conversation: Hashable {
     let id: UUID
     let name: String
@@ -16,6 +18,7 @@ struct Conversation: Hashable {
     let colorSeed: Int
 }
 
+/// 单条聊天消息模型。
 struct ChatMessage: Hashable {
     let id: UUID
     let text: String

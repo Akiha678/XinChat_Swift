@@ -1,6 +1,8 @@
 import Foundation
 
+/// 联系人页面 ViewModel，将网络过程转换为页面可直接渲染的状态。
 final class ContactsViewModel {
+    /// 联系人列表的完整页面状态，保证 loading、content 与 error 互斥。
     enum State {
         case idle
         case loading
@@ -19,6 +21,7 @@ final class ContactsViewModel {
         self.repository = repository
     }
 
+    /// 重新请求联系人；同时供首次加载和下拉刷新调用。
     func load() {
         state = .loading
         repository.fetchContacts { [weak self] result in

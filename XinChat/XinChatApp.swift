@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+/// XinChat 应用入口。
 @main
 struct XinChatApp: App {
     var body: some Scene {

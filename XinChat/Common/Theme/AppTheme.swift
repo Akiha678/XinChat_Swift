@@ -1,5 +1,6 @@
 import UIKit
 
+/// 应用视觉令牌，集中维护颜色，避免业务页面散落硬编码样式。
 enum AppTheme {
     static let tint = UIColor(red: 0.12, green: 0.49, blue: 0.96, alpha: 1)
     static let background = UIColor.systemGroupedBackground

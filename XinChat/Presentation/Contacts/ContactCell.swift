@@ -1,6 +1,7 @@
 import SnapKit
 import UIKit
 
+/// 联系人列表单元格，展示头像、姓名及账号信息。
 final class ContactCell: UITableViewCell {
     static let reuseIdentifier = "ContactCell"
     private let avatarView = AvatarView(size: 44)
@@ -31,6 +32,7 @@ final class ContactCell: UITableViewCell {
 
     required init?(coder: NSCoder) { nil }
 
+    /// 使用联系人模型更新展示内容。
     func configure(contact: Contact) {
         avatarView.configure(name: contact.name, seed: contact.id)
         nameLabel.text = contact.name
