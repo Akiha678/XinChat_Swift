@@ -3,6 +3,8 @@ import UIKit
 
 /// 个人中心基础页面，展示用户资料和常用功能入口。
 final class ProfileViewController: UIViewController {
+    private let user: AuthenticatedUser
+    private let onLogout: () -> Void
     private let scrollView = UIScrollView()
     private let contentView = UIView()
     private let profileCard = UIView()
@@ -10,6 +12,15 @@ final class ProfileViewController: UIViewController {
     private let nameLabel = UILabel()
     private let accountLabel = UILabel()
     private let menuStack = UIStackView()
+    private let logoutButton = UIButton(type: .system)
+
+    init(user: AuthenticatedUser, onLogout: @escaping () -> Void) {
+        self.user = user
+        self.onLogout = onLogout
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) { nil }
 
     // MARK: - Lifecycle
 
@@ -24,10 +35,10 @@ final class ProfileViewController: UIViewController {
         view.backgroundColor = AppTheme.background
         profileCard.backgroundColor = .systemBackground
         profileCard.layer.cornerRadius = 16
-        avatarView.configure(name: "鑫", seed: 0)
-        nameLabel.text = "XinChat 用户"
+        avatarView.configure(name: user.displayName, seed: user.avatarColor)
+        nameLabel.text = user.displayName
         nameLabel.font = .systemFont(ofSize: 21, weight: .bold)
-        accountLabel.text = "XinChat ID：xin_2026"
+        accountLabel.text = "XinChat ID：\(user.username)"
         accountLabel.font = .systemFont(ofSize: 14)
         accountLabel.textColor = AppTheme.secondaryText
         menuStack.axis = .vertical
@@ -49,6 +60,14 @@ final class ProfileViewController: UIViewController {
         rows.forEach { icon, title, color in
             menuStack.addArrangedSubview(makeMenuRow(icon: icon, title: title, color: color))
         }
+
+        logoutButton.setTitle("退出登录", for: .normal)
+        logoutButton.setTitleColor(.systemRed, for: .normal)
+        logoutButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
+        logoutButton.backgroundColor = .systemBackground
+        logoutButton.layer.cornerRadius = 14
+        logoutButton.addTarget(self, action: #selector(logoutTapped), for: .touchUpInside)
+        contentView.addSubview(logoutButton)
 
         scrollView.snp.makeConstraints { $0.edges.equalToSuperview() }
         contentView.snp.makeConstraints {
@@ -77,6 +96,18 @@ final class ProfileViewController: UIViewController {
             $0.top.equalTo(profileCard.snp.bottom).offset(22)
             $0.leading.trailing.equalTo(profileCard)
         }
+        logoutButton.snp.makeConstraints {
+            $0.top.equalTo(menuStack.snp.bottom).offset(22)
+            $0.leading.trailing.equalTo(profileCard)
+            $0.height.equalTo(52)
+        }
+    }
+
+    @objc private func logoutTapped() {
+        let alert = UIAlertController(title: "退出登录", message: "确定要退出当前账号吗？", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "退出", style: .destructive) { [weak self] _ in self?.onLogout() })
+        present(alert, animated: true)
     }
 
     /// 创建样式统一的个人中心菜单行。

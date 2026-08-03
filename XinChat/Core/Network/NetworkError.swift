@@ -5,7 +5,7 @@ enum NetworkError: LocalizedError {
     /// 响应对象或响应内容不符合预期。
     case invalidResponse
     /// 服务端返回非成功状态码。
-    case server(statusCode: Int)
+    case server(statusCode: Int, message: String?)
     /// 响应数据无法解析为目标模型。
     case decoding(Error)
     /// 超时、断网、DNS 等传输错误。
@@ -14,7 +14,7 @@ enum NetworkError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidResponse: "服务器响应无效"
-        case let .server(code): "服务暂时不可用（\(code)）"
+        case let .server(code, message): message ?? "服务暂时不可用（\(code)）"
         case .decoding: "数据解析失败"
         case let .transport(error): error.localizedDescription
         }

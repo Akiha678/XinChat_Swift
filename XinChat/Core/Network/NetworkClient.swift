@@ -14,12 +14,13 @@ protocol NetworkClientProtocol {
 /// 基于 Alamofire 的统一网络请求实现。
 /// 负责 URL 组装、参数编码、状态码校验、JSON 解码和错误映射。
 final class NetworkClient: NetworkClientProtocol {
+    private struct ServerErrorBody: Decodable { let message: String? }
     private let baseURL: URL
     private let session: Session
 
     init(
-        // 演示环境使用 JSONPlaceholder；正式项目应从环境配置中注入该地址。
-        baseURL: URL = URL(string: "https://jsonplaceholder.typicode.com")!,
+        // iOS 模拟器默认连接本机 Spring Boot；真机调试时应替换为开发机局域网地址。
+        baseURL: URL = AppEnvironment.apiBaseURL,
         session: Session = .default
     ) {
         self.baseURL = baseURL
@@ -46,7 +47,10 @@ final class NetworkClient: NetworkClientProtocol {
                 result = .success(value)
             case let .failure(error):
                 if let statusCode = response.response?.statusCode {
-                    result = .failure(.server(statusCode: statusCode))
+                    let message = response.data.flatMap {
+                        try? JSONDecoder().decode(ServerErrorBody.self, from: $0).message
+                    }
+                    result = .failure(.server(statusCode: statusCode, message: message))
                 } else {
                     result = .failure(.transport(error))
                 }

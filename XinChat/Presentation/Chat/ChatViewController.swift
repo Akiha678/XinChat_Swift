@@ -1,22 +1,18 @@
 import SnapKit
 import UIKit
 
-/// 单聊详情页面，展示消息气泡并提供本地发送交互。
-/// 当前消息仅保存在内存中，后续可通过 ViewModel 接入即时通信服务。
+/// 单聊详情页面，展示持久化消息，并通过 WebSocket 实时接收新消息。
 final class ChatViewController: UIViewController {
-    private let conversation: Conversation
+    private let viewModel: ChatViewModel
+    private lazy var appBar = AppBarView(title: viewModel.conversation.name)
     private let tableView = UITableView(frame: .zero, style: .plain)
+    private let loadingView = UIActivityIndicatorView(style: .large)
     private let inputContainer = UIView()
     private let textField = UITextField()
     private let sendButton = UIButton(type: .system)
-    private var messages: [ChatMessage]
 
-    init(conversation: Conversation) {
-        self.conversation = conversation
-        messages = [
-            ChatMessage(id: UUID(), text: "你好，欢迎使用 XinChat 👋", isOutgoing: false, time: "09:30"),
-            ChatMessage(id: UUID(), text: conversation.preview, isOutgoing: true, time: conversation.time)
-        ]
+    init(viewModel: ChatViewModel) {
+        self.viewModel = viewModel
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -26,15 +22,33 @@ final class ChatViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = conversation.name
-        navigationItem.largeTitleDisplayMode = .never
         setupUI()
+        bind()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.setNavigationBarHidden(true, animated: animated)
+        viewModel.activate()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        navigationController?.setNavigationBarHidden(false, animated: animated)
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        viewModel.deactivate()
     }
 
     // MARK: - Layout
 
     private func setupUI() {
         view.backgroundColor = AppTheme.background
+        appBar.onBackTapped = { [weak self] in
+            self?.navigationController?.popViewController(animated: true)
+        }
         tableView.backgroundColor = .clear
         tableView.separatorStyle = .none
         tableView.dataSource = self
@@ -51,11 +65,18 @@ final class ChatViewController: UIViewController {
         sendButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
         sendButton.addTarget(self, action: #selector(sendTapped), for: .touchUpInside)
 
+        view.addSubview(appBar)
         view.addSubview(tableView)
+        view.addSubview(loadingView)
         view.addSubview(inputContainer)
         inputContainer.addSubview(textField)
         inputContainer.addSubview(sendButton)
 
+        appBar.snp.makeConstraints {
+            $0.top.equalTo(view.safeAreaLayoutGuide.snp.top)
+            $0.leading.trailing.equalToSuperview()
+            $0.height.equalTo(AppBarView.contentHeight)
+        }
         inputContainer.snp.makeConstraints {
             $0.leading.trailing.bottom.equalTo(view.safeAreaLayoutGuide)
             $0.height.equalTo(58)
@@ -72,30 +93,56 @@ final class ChatViewController: UIViewController {
             $0.width.equalTo(46)
         }
         tableView.snp.makeConstraints {
-            $0.top.leading.trailing.equalToSuperview()
+            $0.top.equalTo(appBar.snp.bottom)
+            $0.leading.trailing.equalToSuperview()
             $0.bottom.equalTo(inputContainer.snp.top)
         }
+        loadingView.snp.makeConstraints { $0.center.equalTo(tableView) }
+    }
+
+    private func bind() {
+        viewModel.onDataChanged = { [weak self] in
+            guard let self else { return }
+            tableView.reloadData()
+            if !viewModel.messages.isEmpty {
+                tableView.scrollToRow(
+                    at: IndexPath(row: viewModel.messages.count - 1, section: 0),
+                    at: .bottom,
+                    animated: true
+                )
+            }
+        }
+        viewModel.onLoadingChanged = { [weak self] isLoading in
+            isLoading ? self?.loadingView.startAnimating() : self?.loadingView.stopAnimating()
+        }
+        viewModel.onError = { [weak self] message in self?.showError(message) }
     }
 
     // MARK: - Actions
 
     @objc private func sendTapped() {
         guard let text = textField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return }
-        messages.append(ChatMessage(id: UUID(), text: text, isOutgoing: true, time: "刚刚"))
         textField.text = nil
-        tableView.reloadData()
-        tableView.scrollToRow(at: IndexPath(row: messages.count - 1, section: 0), at: .bottom, animated: true)
+        viewModel.send(text: text)
+    }
+
+    private func showError(_ message: String) {
+        let alert = UIAlertController(title: "操作失败", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "知道了", style: .default))
+        present(alert, animated: true)
     }
 }
 
 // MARK: - UITableViewDataSource
 
 extension ChatViewController: UITableViewDataSource {
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { messages.count }
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        viewModel.messages.count
+    }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: ChatMessageCell.reuseIdentifier, for: indexPath)
-        (cell as? ChatMessageCell)?.configure(message: messages[indexPath.row])
+        (cell as? ChatMessageCell)?.configure(message: viewModel.messages[indexPath.row])
         return cell
     }
 }

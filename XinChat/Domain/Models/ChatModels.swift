@@ -1,27 +1,56 @@
 import Foundation
 
-/// 服务端联系人模型。
+private let serverDateFormatter: ISO8601DateFormatter = {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter
+}()
+
+/// 服务端用户摘要，同时用于好友和好友候选列表。
 struct Contact: Decodable, Hashable {
     let id: Int
     let name: String
     let username: String
     let email: String
+    let avatarColor: Int
+}
+
+/// 服务端接受好友申请后返回的回执。
+struct FriendRequestReceipt: Decodable {
+    let id: Int
 }
 
 /// 会话列表展示模型。
-struct Conversation: Hashable {
-    let id: UUID
+struct Conversation: Decodable, Hashable {
+    let id: Int
+    let peerId: Int
     let name: String
     let preview: String
-    let time: String
+    let lastMessageAt: String?
     let unreadCount: Int
     let colorSeed: Int
+
+    var time: String {
+        guard let lastMessageAt,
+              let date = serverDateFormatter.date(from: lastMessageAt) else { return "" }
+        return date.formatted(date: .omitted, time: .shortened)
+    }
 }
 
-/// 单条聊天消息模型。
-struct ChatMessage: Hashable {
-    let id: UUID
-    let text: String
-    let isOutgoing: Bool
-    let time: String
+/// 服务端聊天消息模型。
+struct ChatMessage: Decodable, Hashable {
+    let id: Int
+    let conversationId: Int
+    let senderId: Int
+    let content: String
+    let type: String
+    let createdAt: String
+
+    var text: String { content }
+    var isOutgoing: Bool { senderId == AppSession.currentUserID }
+
+    var time: String {
+        guard let date = serverDateFormatter.date(from: createdAt) else { return "" }
+        return date.formatted(date: .omitted, time: .shortened)
+    }
 }

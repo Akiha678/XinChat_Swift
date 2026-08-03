@@ -9,16 +9,25 @@ final class AppContainer {
     static let shared = AppContainer()
 
     private let networkClient: NetworkClientProtocol
+    private let authRepository: AuthRepositoryProtocol
     private let chatRepository: ChatRepositoryProtocol
+    private let realtimeClient: ChatRealtimeClientProtocol
 
     private init() {
         let client = NetworkClient()
         networkClient = client
+        authRepository = AuthRepository(networkClient: client)
+        /// 创建数据仓库
         chatRepository = ChatRepository(networkClient: client)
+        realtimeClient = ChatRealtimeClient()
     }
 
     /// 创建应用根控制器，并将共享 Repository 注入各业务模块。
     func makeRootViewController() -> UIViewController {
-        RootTabBarController(repository: chatRepository)
+        AppRootViewController(
+            authRepository: authRepository,
+            chatRepository: chatRepository,
+            realtimeClient: realtimeClient
+        )
     }
 }

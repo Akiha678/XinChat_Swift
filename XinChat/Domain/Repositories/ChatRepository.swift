@@ -1,15 +1,33 @@
 import Foundation
 
 /// 通讯业务的数据访问边界。
-/// Presentation 层只依赖该协议，不感知数据来自网络、数据库还是本地缓存。
 protocol ChatRepositoryProtocol {
-    /// 从远端获取联系人列表。
     func fetchContacts(completion: @escaping (Result<[Contact], NetworkError>) -> Void)
-    /// 获取当前会话列表。
-    func conversations() -> [Conversation]
+    func fetchFriendCandidates(
+        keyword: String,
+        completion: @escaping (Result<[Contact], NetworkError>) -> Void
+    )
+    func sendFriendRequest(
+        contactID: Int,
+        completion: @escaping (Result<FriendRequestReceipt, NetworkError>) -> Void
+    )
+    func fetchConversations(completion: @escaping (Result<[Conversation], NetworkError>) -> Void)
+    func createDirectConversation(
+        friendID: Int,
+        completion: @escaping (Result<Conversation, NetworkError>) -> Void
+    )
+    func fetchMessages(
+        conversationID: Int,
+        completion: @escaping (Result<[ChatMessage], NetworkError>) -> Void
+    )
+    func sendMessage(
+        conversationID: Int,
+        content: String,
+        completion: @escaping (Result<ChatMessage, NetworkError>) -> Void
+    )
 }
 
-/// 通讯数据仓库的默认实现。
+/// 基于统一网络客户端的通讯数据仓库。
 final class ChatRepository: ChatRepositoryProtocol {
     private let networkClient: NetworkClientProtocol
 
@@ -18,16 +36,66 @@ final class ChatRepository: ChatRepositoryProtocol {
     }
 
     func fetchContacts(completion: @escaping (Result<[Contact], NetworkError>) -> Void) {
-        networkClient.request(ChatAPI.contacts, responseType: [Contact].self, completion: completion)
+        networkClient.request(ChatAPI.friends, responseType: [Contact].self, completion: completion)
     }
 
-    func conversations() -> [Conversation] {
-        // 当前为 UI 演示数据，接入后端后可替换为本地数据库与增量同步结果。
-        [
-            Conversation(id: UUID(), name: "产品研发群", preview: "林夕：新版本已经提交测试", time: "10:28", unreadCount: 3, colorSeed: 0),
-            Conversation(id: UUID(), name: "陈晨", preview: "好的，下午会议见", time: "09:42", unreadCount: 0, colorSeed: 1),
-            Conversation(id: UUID(), name: "设计协作群", preview: "你收到了一张图片", time: "昨天", unreadCount: 8, colorSeed: 2),
-            Conversation(id: UUID(), name: "系统通知", preview: "欢迎使用 XinChat", time: "星期五", unreadCount: 0, colorSeed: 3)
-        ]
+    func fetchFriendCandidates(
+        keyword: String,
+        completion: @escaping (Result<[Contact], NetworkError>) -> Void
+    ) {
+        networkClient.request(
+            ChatAPI.friendCandidates(keyword: keyword),
+            responseType: [Contact].self,
+            completion: completion
+        )
+    }
+
+    func sendFriendRequest(
+        contactID: Int,
+        completion: @escaping (Result<FriendRequestReceipt, NetworkError>) -> Void
+    ) {
+        networkClient.request(
+            ChatAPI.sendFriendRequest(contactID: contactID),
+            responseType: FriendRequestReceipt.self,
+            completion: completion
+        )
+    }
+
+    func fetchConversations(completion: @escaping (Result<[Conversation], NetworkError>) -> Void) {
+        networkClient.request(ChatAPI.conversations, responseType: [Conversation].self, completion: completion)
+    }
+
+    func createDirectConversation(
+        friendID: Int,
+        completion: @escaping (Result<Conversation, NetworkError>) -> Void
+    ) {
+        networkClient.request(
+            ChatAPI.createDirectConversation(friendID: friendID),
+            responseType: Conversation.self,
+            completion: completion
+        )
+    }
+
+    func fetchMessages(
+        conversationID: Int,
+        completion: @escaping (Result<[ChatMessage], NetworkError>) -> Void
+    ) {
+        networkClient.request(
+            ChatAPI.messages(conversationID: conversationID),
+            responseType: [ChatMessage].self,
+            completion: completion
+        )
+    }
+
+    func sendMessage(
+        conversationID: Int,
+        content: String,
+        completion: @escaping (Result<ChatMessage, NetworkError>) -> Void
+    ) {
+        networkClient.request(
+            ChatAPI.sendMessage(conversationID: conversationID, content: content),
+            responseType: ChatMessage.self,
+            completion: completion
+        )
     }
 }

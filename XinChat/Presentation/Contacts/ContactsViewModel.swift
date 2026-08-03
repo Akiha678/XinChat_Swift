@@ -31,4 +31,12 @@ final class ContactsViewModel {
             }
         }
     }
+
+    /// 为指定好友创建或复用单聊会话。
+    func createConversation(
+        with contact: Contact,
+        completion: @escaping (Result<Conversation, NetworkError>) -> Void
+    ) {
+        repository.createDirectConversation(friendID: contact.id, completion: completion)
+    }
 }
