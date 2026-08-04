@@ -42,7 +42,7 @@ final class AddFriendViewController: UIViewController {
         view.backgroundColor = AppTheme.background
         appBar.onBackTapped = { [weak self] in self?.navigationController?.popViewController(animated: true) }
 
-        searchBar.placeholder = "搜索姓名、用户名或邮箱"
+        searchBar.placeholder = "输入用户名搜索"
         searchBar.searchBarStyle = .minimal
         searchBar.delegate = self
 
@@ -82,13 +82,14 @@ final class AddFriendViewController: UIViewController {
         viewModel.onDataChanged = { [weak self] in self?.renderData() }
         viewModel.onLoadStateChanged = { [weak self] state in self?.renderLoadState(state) }
         viewModel.onError = { [weak self] message in self?.showError(message) }
+        viewModel.onNotice = { [weak self] message in self?.showNotice(message) }
     }
 
     // MARK: - Rendering
 
     private func renderData() {
         tableView.reloadData()
-        messageLabel.text = "没有找到匹配的用户"
+        messageLabel.text = viewModel.query.isEmpty ? "输入用户名查找好友" : "没有找到可添加的用户"
         messageLabel.isHidden = !viewModel.visibleContacts.isEmpty
     }
 
@@ -110,6 +111,12 @@ final class AddFriendViewController: UIViewController {
 
     private func showError(_ message: String) {
         let alert = UIAlertController(title: "发送失败", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "知道了", style: .default))
+        present(alert, animated: true)
+    }
+
+    private func showNotice(_ message: String) {
+        let alert = UIAlertController(title: "申请已发送", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "知道了", style: .default))
         present(alert, animated: true)
     }
@@ -145,5 +152,6 @@ extension AddFriendViewController: UISearchBarDelegate {
 
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         searchBar.resignFirstResponder()
+        viewModel.searchImmediately()
     }
 }

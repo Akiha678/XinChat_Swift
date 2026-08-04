@@ -5,6 +5,8 @@ enum ChatRealtimeEvent {
     case connected
     case disconnected
     case messageCreated(ChatMessage)
+    case friendshipChanged
+    case conversationRead
 }
 
 protocol ChatRealtimeClientProtocol: AnyObject {
@@ -23,7 +25,11 @@ protocol ChatRealtimeClientProtocol: AnyObject {
 /// - 将稳定的服务端事件广播给业务 ViewModel。
 ///
 final class ChatRealtimeClient: NSObject, ChatRealtimeClientProtocol {
-    private struct Envelope: Decodable {
+    private struct EventHeader: Decodable {
+        let type: String
+    }
+
+    private struct MessageEnvelope: Decodable {
         let type: String
         let data: ChatMessage
     }
@@ -123,9 +129,18 @@ final class ChatRealtimeClient: NSObject, ChatRealtimeClientProtocol {
         @unknown default: data = nil
         }
         guard let data,
-              let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
-              envelope.type == "message.created" else { return }
-        notify(.messageCreated(envelope.data))
+              let header = try? JSONDecoder().decode(EventHeader.self, from: data) else { return }
+        switch header.type {
+        case "message.created":
+            guard let envelope = try? JSONDecoder().decode(MessageEnvelope.self, from: data) else { return }
+            notify(.messageCreated(envelope.data))
+        case "friendship.accepted":
+            notify(.friendshipChanged)
+        case "conversation.read":
+            notify(.conversationRead)
+        default:
+            break
+        }
     }
 
     private func handleOpened(_ task: URLSessionWebSocketTask) {

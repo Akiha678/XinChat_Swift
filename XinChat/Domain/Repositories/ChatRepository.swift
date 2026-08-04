@@ -11,6 +11,17 @@ protocol ChatRepositoryProtocol {
         contactID: Int,
         completion: @escaping (Result<FriendRequestReceipt, NetworkError>) -> Void
     )
+    func fetchIncomingFriendRequests(
+        completion: @escaping (Result<[FriendRequest], NetworkError>) -> Void
+    )
+    func acceptFriendRequest(
+        requestID: Int,
+        completion: @escaping (Result<FriendRequest, NetworkError>) -> Void
+    )
+    func rejectFriendRequest(
+        requestID: Int,
+        completion: @escaping (Result<FriendRequest, NetworkError>) -> Void
+    )
     func fetchConversations(completion: @escaping (Result<[Conversation], NetworkError>) -> Void)
     func createDirectConversation(
         friendID: Int,
@@ -24,6 +35,10 @@ protocol ChatRepositoryProtocol {
         conversationID: Int,
         content: String,
         completion: @escaping (Result<ChatMessage, NetworkError>) -> Void
+    )
+    func markConversationRead(
+        conversationID: Int,
+        completion: @escaping (Result<ReadConversationReceipt, NetworkError>) -> Void
     )
 }
 
@@ -57,6 +72,38 @@ final class ChatRepository: ChatRepositoryProtocol {
         networkClient.request(
             ChatAPI.sendFriendRequest(contactID: contactID),
             responseType: FriendRequestReceipt.self,
+            completion: completion
+        )
+    }
+
+    func fetchIncomingFriendRequests(
+        completion: @escaping (Result<[FriendRequest], NetworkError>) -> Void
+    ) {
+        networkClient.request(
+            ChatAPI.incomingFriendRequests,
+            responseType: [FriendRequest].self,
+            completion: completion
+        )
+    }
+
+    func acceptFriendRequest(
+        requestID: Int,
+        completion: @escaping (Result<FriendRequest, NetworkError>) -> Void
+    ) {
+        networkClient.request(
+            ChatAPI.acceptFriendRequest(requestID: requestID),
+            responseType: FriendRequest.self,
+            completion: completion
+        )
+    }
+
+    func rejectFriendRequest(
+        requestID: Int,
+        completion: @escaping (Result<FriendRequest, NetworkError>) -> Void
+    ) {
+        networkClient.request(
+            ChatAPI.rejectFriendRequest(requestID: requestID),
+            responseType: FriendRequest.self,
             completion: completion
         )
     }
@@ -95,6 +142,17 @@ final class ChatRepository: ChatRepositoryProtocol {
         networkClient.request(
             ChatAPI.sendMessage(conversationID: conversationID, content: content),
             responseType: ChatMessage.self,
+            completion: completion
+        )
+    }
+
+    func markConversationRead(
+        conversationID: Int,
+        completion: @escaping (Result<ReadConversationReceipt, NetworkError>) -> Void
+    ) {
+        networkClient.request(
+            ChatAPI.markConversationRead(conversationID: conversationID),
+            responseType: ReadConversationReceipt.self,
             completion: completion
         )
     }

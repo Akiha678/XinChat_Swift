@@ -21,6 +21,11 @@ final class ConversationListViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         bind()
+        viewModel.activate()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
         viewModel.load()
     }
 
@@ -52,6 +57,9 @@ final class ConversationListViewController: UIViewController {
             if !isLoading { self?.tableView.refreshControl?.endRefreshing() }
         }
         viewModel.onError = { [weak self] message in self?.showError(message) }
+        viewModel.onUnreadCountChanged = { [weak self] count in
+            self?.navigationController?.tabBarItem.badgeValue = count > 0 ? "\(min(count, 99))" : nil
+        }
     }
 
     // MARK: - Actions

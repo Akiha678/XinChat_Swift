@@ -34,6 +34,11 @@ final class ChatViewModel {
             case let .messageCreated(message):
                 guard message.conversationId == conversation.id else { return }
                 merge([message])
+                markRead()
+            case .friendshipChanged:
+                break
+            case .conversationRead:
+                break
             case .disconnected:
                 break
             }
@@ -61,6 +66,7 @@ final class ChatViewModel {
             switch result {
             case let .success(remoteMessages):
                 merge(remoteMessages)
+                markRead()
             case let .failure(error):
                 onError?(error.localizedDescription)
             }
@@ -87,5 +93,10 @@ final class ChatViewModel {
         guard merged != messages else { return }
         messages = merged
         onDataChanged?()
+    }
+
+    /// 页面处于当前会话时推进服务端已读游标，未读数由服务端统一计算。
+    private func markRead() {
+        repository.markConversationRead(conversationID: conversation.id) { _ in }
     }
 }

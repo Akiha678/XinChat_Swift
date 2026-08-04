@@ -33,11 +33,16 @@ final class NetworkClient: NetworkClientProtocol {
         completion: @escaping (Result<T, NetworkError>) -> Void
     ) {
         let url = baseURL.appending(path: endpoint.path)
+        var headers = HTTPHeaders()
+        if endpoint.requiresAuthentication, let token = AppSession.accessToken {
+            headers.add(.authorization(bearerToken: token))
+        }
         session.request(
             url,
             method: endpoint.method,
             parameters: endpoint.parameters,
-            encoding: endpoint.method == .get ? URLEncoding.default : JSONEncoding.default
+            encoding: endpoint.method == .get ? URLEncoding.default : JSONEncoding.default,
+            headers: headers
         )
         .validate(statusCode: 200..<300)
         .responseDecodable(of: responseType) { response in

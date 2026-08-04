@@ -6,6 +6,11 @@ protocol APIEndpoint {
     var path: String { get }
     var method: HTTPMethod { get }
     var parameters: Parameters? { get }
+    var requiresAuthentication: Bool { get }
+}
+
+extension APIEndpoint {
+    var requiresAuthentication: Bool { true }
 }
 
 /// 认证模块接口集合。
@@ -14,6 +19,7 @@ enum AuthAPI: APIEndpoint {
 
     var path: String { "/auth/login" }
     var method: HTTPMethod { .post }
+    var requiresAuthentication: Bool { false }
     var parameters: Parameters? {
         switch self {
         case let .login(username, password):
@@ -28,10 +34,14 @@ enum ChatAPI {
     case friendCandidates(keyword: String)
     /// 发送好友申请。
     case sendFriendRequest(contactID: Int)
+    case incomingFriendRequests
+    case acceptFriendRequest(requestID: Int)
+    case rejectFriendRequest(requestID: Int)
     case conversations
     case createDirectConversation(friendID: Int)
     case messages(conversationID: Int)
     case sendMessage(conversationID: Int, content: String)
+    case markConversationRead(conversationID: Int)
 }
 
 extension ChatAPI: APIEndpoint {
@@ -40,40 +50,47 @@ extension ChatAPI: APIEndpoint {
         case .friends: "/friends"
         case .friendCandidates: "/users/search"
         case .sendFriendRequest: "/friend-requests"
+        case .incomingFriendRequests: "/friend-requests/incoming"
+        case let .acceptFriendRequest(requestID): "/friend-requests/\(requestID)/accept"
+        case let .rejectFriendRequest(requestID): "/friend-requests/\(requestID)/reject"
         case .conversations: "/conversations"
         case .createDirectConversation: "/conversations/direct"
         case let .messages(conversationID): "/conversations/\(conversationID)/messages"
         case let .sendMessage(conversationID, _): "/conversations/\(conversationID)/messages"
+        case let .markConversationRead(conversationID): "/conversations/\(conversationID)/read"
         }
     }
 
     var method: HTTPMethod {
         switch self {
-        case .friends, .friendCandidates, .conversations, .messages: .get
-        case .sendFriendRequest, .createDirectConversation, .sendMessage: .post
+        case .friends, .friendCandidates, .incomingFriendRequests, .conversations, .messages: .get
+        case .sendFriendRequest, .acceptFriendRequest, .rejectFriendRequest,
+             .createDirectConversation, .sendMessage, .markConversationRead: .post
         }
     }
 
     var parameters: Parameters? {
         switch self {
         case .friends:
-            ["userId": AppSession.currentUserID]
+            nil
         case let .friendCandidates(keyword):
-            ["currentUserId": AppSession.currentUserID, "keyword": keyword]
+            ["username": keyword]
         case let .sendFriendRequest(contactID):
             [
-                "requesterId": AppSession.currentUserID,
                 "addresseeId": contactID,
                 "message": "你好，我想添加你为好友"
             ]
+        case .incomingFriendRequests, .acceptFriendRequest, .rejectFriendRequest,
+             .markConversationRead:
+            nil
         case .conversations:
-            ["userId": AppSession.currentUserID]
+            nil
         case let .createDirectConversation(friendID):
-            ["userId": AppSession.currentUserID, "friendId": friendID]
+            ["friendId": friendID]
         case .messages:
-            ["userId": AppSession.currentUserID, "limit": 50]
+            ["limit": 50]
         case let .sendMessage(_, content):
-            ["senderId": AppSession.currentUserID, "content": content]
+            ["content": content]
         }
     }
 }

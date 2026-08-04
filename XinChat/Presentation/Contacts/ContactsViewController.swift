@@ -5,6 +5,7 @@ import UIKit
 final class ContactsViewController: UIViewController {
     /// 由根组装层注入添加好友页面工厂，避免当前页面直接创建 Repository。
     var makeAddFriendViewController: (() -> UIViewController)?
+    var makeFriendRequestsViewController: (() -> UIViewController)?
     var makeChatViewController: ((Conversation) -> UIViewController)?
 
     private let viewModel: ContactsViewModel
@@ -12,6 +13,7 @@ final class ContactsViewController: UIViewController {
     private let loadingView = UIActivityIndicatorView(style: .large)
     private let messageLabel = UILabel()
     private var contacts: [Contact] = []
+    private var pendingRequestCount = 0
 
     init(viewModel: ContactsViewModel) {
         self.viewModel = viewModel
@@ -26,6 +28,10 @@ final class ContactsViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         bind()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
         viewModel.load()
     }
 
@@ -78,10 +84,11 @@ final class ContactsViewController: UIViewController {
         case .loading:
             messageLabel.isHidden = true
             loadingView.startAnimating()
-        case let .loaded(contacts):
+        case let .loaded(contacts, pendingRequestCount):
             loadingView.stopAnimating()
             messageLabel.isHidden = true
             self.contacts = contacts
+            self.pendingRequestCount = pendingRequestCount
             tableView.reloadData()
         case let .failed(message):
             loadingView.stopAnimating()
@@ -104,9 +111,25 @@ final class ContactsViewController: UIViewController {
 // MARK: - UITableViewDataSource & UITableViewDelegate
 
 extension ContactsViewController: UITableViewDataSource, UITableViewDelegate {
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { contacts.count }
+    func numberOfSections(in tableView: UITableView) -> Int { 2 }
+
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        section == 0 ? 1 : contacts.count
+    }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        if indexPath.section == 0 {
+            let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
+            var configuration = cell.defaultContentConfiguration()
+            configuration.text = "新的朋友"
+            configuration.image = UIImage(systemName: "person.crop.circle.badge.plus")
+            configuration.imageProperties.tintColor = AppTheme.tint
+            configuration.secondaryText = pendingRequestCount > 0 ? "\(pendingRequestCount) 条待处理" : nil
+            configuration.secondaryTextProperties.color = .systemRed
+            cell.contentConfiguration = configuration
+            cell.accessoryType = .disclosureIndicator
+            return cell
+        }
         let cell = tableView.dequeueReusableCell(withIdentifier: ContactCell.reuseIdentifier, for: indexPath)
         (cell as? ContactCell)?.configure(contact: contacts[indexPath.row])
         return cell
@@ -114,6 +137,12 @@ extension ContactsViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
+        if indexPath.section == 0 {
+            guard let viewController = makeFriendRequestsViewController?() else { return }
+            viewController.hidesBottomBarWhenPushed = true
+            navigationController?.pushViewController(viewController, animated: true)
+            return
+        }
         let contact = contacts[indexPath.row]
         viewModel.createConversation(with: contact) { [weak self] result in
             switch result {

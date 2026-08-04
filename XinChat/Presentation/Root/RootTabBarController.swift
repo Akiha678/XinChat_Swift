@@ -28,7 +28,10 @@ final class RootTabBarController: UITabBarController {
         tabBar.backgroundColor = .systemBackground
 
         let messages = ConversationListViewController(
-            viewModel: ConversationListViewModel(repository: repository)
+            viewModel: ConversationListViewModel(
+                repository: repository,
+                realtimeClient: realtimeClient
+            )
         )
         let contacts = ContactsViewController(
             viewModel: ContactsViewModel(repository: repository)
@@ -38,6 +41,11 @@ final class RootTabBarController: UITabBarController {
         contacts.makeAddFriendViewController = {
             AddFriendViewController(
                 viewModel: AddFriendViewModel(repository: addFriendRepository)
+            )
+        }
+        contacts.makeFriendRequestsViewController = {
+            FriendRequestsViewController(
+                viewModel: FriendRequestsViewModel(repository: addFriendRepository)
             )
         }
         let realtimeClient = realtimeClient

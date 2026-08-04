@@ -20,6 +20,22 @@ struct FriendRequestReceipt: Decodable {
     let id: Int
 }
 
+/// 服务端确认的会话已读位置。
+struct ReadConversationReceipt: Decodable {
+    let conversationId: Int
+    let lastReadMessageId: Int?
+}
+
+/// 收到的好友申请，用于收件箱和接受/拒绝操作。
+struct FriendRequest: Decodable, Hashable {
+    let id: Int
+    let requester: Contact
+    let addressee: Contact
+    let status: String
+    let message: String?
+    let createdAt: String
+}
+
 /// 会话列表展示模型。
 struct Conversation: Decodable, Hashable {
     let id: Int

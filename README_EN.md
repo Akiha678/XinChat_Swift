@@ -20,11 +20,11 @@ The current version includes account login, a conversation list, chat detail, re
 
 - Three-tab interface: Messages, Contacts, and Profile
 - Username/password login, persisted session state, and logout
-- Conversation previews, timestamps, and unread badges
+- Realtime conversation refresh, latest-message ordering, persisted unread counts, and tab badges
 - Chat bubbles, history loading, and server-backed message sending
 - Remote contact loading, pull-to-refresh, and error retry
-- Candidate search and friend-request status feedback
-- Friend-request submission through an Alamofire POST request with duplicate prevention
+- Username search and friend-request submission with duplicate prevention
+- Incoming-request inbox, pending count, and accept/reject actions
 - Chat navigation from conversations or contacts with the bottom tab bar hidden
 - Light and dark mode support
 - Centralized theme tokens, a reusable avatar component, and a custom AppBar
@@ -100,6 +100,7 @@ XinChat/
 │   ├── Chat/                              # Chat detail module
 │   ├── Contacts/                          # Contacts module
 │   ├── AddFriend/                         # User search and friend requests
+│   ├── FriendRequests/                    # Incoming requests and accept/reject actions
 │   └── Profile/                           # Profile module
 ├── ContentView.swift                      # SwiftUI/UIKit bridge
 └── XinChatApp.swift                       # Application entry point
@@ -139,29 +140,43 @@ xcodebuild \
 
 ## Networking
 
-The client is connected to the companion Spring Boot service. Its base URL is configured centrally in `NetworkClient`:
+The client is connected to the companion Spring Boot service. `AppEnvironment.serverBaseURL` configures its base URL centrally and injects it into `NetworkClient`:
 
 - `POST /auth/login` authenticates a username and password.
-- `GET /friends` and `GET /users/search` provide friends and candidates.
+- `GET /friends` and `GET /users/search?username=` provide friends and username search.
 - `POST /friend-requests` submits a friend request.
+- `GET /friend-requests/incoming` lists incoming pending requests.
+- `POST /friend-requests/{id}/accept|reject` accepts or rejects a request.
 - `GET /conversations` and `POST /conversations/direct` list and create conversations.
 - `GET/POST /conversations/{id}/messages` reads and sends messages.
+- `POST /conversations/{id}/read` advances the authenticated user's read cursor.
 - `WS /ws/chat` delivers Bearer-authenticated realtime message events.
 
-Friendships, conversations, and messages are persisted in MySQL. After login, public user details are stored in `AppSession`, while the access token is stored only in Keychain. Passwords are never stored by the client.
+Friend requests, friendships, conversations, and messages are persisted in MySQL. After login, public user details are stored in `AppSession`, while the access token is stored only in Keychain. Every authenticated REST and WebSocket request uses that Bearer token; the server derives the current user from it and never trusts a client-supplied current-user ID. Passwords are never stored by the client.
 
-Backend migration V3 provides two accounts that are already friends and share a test conversation:
+The complete friend flow is:
+
+1. Open Contacts after signing in and tap the add button.
+2. Search by username. The server excludes the current user, existing friends, and users with pending requests.
+3. Send a request. The recipient sees the pending count on the New Friends row.
+4. The recipient accepts or rejects the request from the inbox. Accepted users then appear in both contact lists.
+5. A direct conversation can be created only after friendship is established; pending or rejected requests cannot bypass this rule.
+
+Accepting a friend request creates or reuses the direct conversation in the same transaction and emits `friendship.accepted` to both users. On `message.created`, the client reconciles the server conversation snapshot, keeping preview text, ordering, timestamps, and persisted unread counts correct after reconnects. Opening a chat advances its read cursor and emits `conversation.read` to synchronize unread state across the current user's online devices.
+
+Backend migrations provide three test accounts:
 
 | Username | Password |
 | --- | --- |
 | `admin1` | `123456` |
 | `admin2` | `123456` |
+| `admin3` | `123456` |
 
-Sign in on two simulators, or on a simulator and a physical device, then open the Admin One/Admin Two conversation to exchange messages. New messages appear through WebSocket while the receiver remains on the chat screen; reopening the conversation is no longer required.
+`admin1` and `admin2` are already friends and can be used for direct message testing. `admin3` has no preconfigured friends, so use it with either existing account to test sending, accepting, or rejecting a friend request before creating a chat. New messages appear through WebSocket while the receiver remains on the chat screen; reopening the conversation is no longer required.
 
 Messages are persisted through REST and received through WebSocket. The client implements a 20-second heartbeat, exponential reconnection capped at 30 seconds, message-ID deduplication, and REST reconciliation after reconnecting so events missed during a short outage are recovered.
 
-Start the companion `xinchat` Spring Boot backend before running the app. A physical device cannot reach the development machine through `127.0.0.1`; replace `NetworkClient.baseURL` with the machine's LAN address.
+Start the companion `xinchat` Spring Boot backend before running the app. A physical device cannot reach the development machine through `127.0.0.1`; set `AppEnvironment.serverBaseURL` to the machine's LAN address.
 
 When switching environments:
 
@@ -178,7 +193,6 @@ Friends, conversations, and messages are persisted in MySQL with WebSocket realt
 
 - Registration, JWT authentication, and token refresh
 - Background WebSocket handling and APNs offline notifications
-- An iOS friend-request inbox with accept/reject actions
 - SQLite/Core Data message persistence
 - Pagination, offline synchronization, and read receipts
 - Image, audio, and file message types

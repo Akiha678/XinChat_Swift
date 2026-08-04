@@ -6,7 +6,7 @@ final class ContactsViewModel {
     enum State {
         case idle
         case loading
-        case loaded([Contact])
+        case loaded(contacts: [Contact], pendingRequestCount: Int)
         case failed(String)
     }
 
@@ -24,10 +24,27 @@ final class ContactsViewModel {
     /// 重新请求联系人；同时供首次加载和下拉刷新调用。
     func load() {
         state = .loading
-        repository.fetchContacts { [weak self] result in
-            switch result {
-            case let .success(contacts): self?.state = .loaded(contacts)
-            case let .failure(error): self?.state = .failed(error.localizedDescription)
+        let group = DispatchGroup()
+        var contactsResult: Result<[Contact], NetworkError>?
+        var requestsResult: Result<[FriendRequest], NetworkError>?
+
+        group.enter()
+        repository.fetchContacts { result in
+            contactsResult = result
+            group.leave()
+        }
+        group.enter()
+        repository.fetchIncomingFriendRequests { result in
+            requestsResult = result
+            group.leave()
+        }
+        group.notify(queue: .main) { [weak self] in
+            guard let self, let contactsResult, let requestsResult else { return }
+            switch (contactsResult, requestsResult) {
+            case let (.success(contacts), .success(requests)):
+                state = .loaded(contacts: contacts, pendingRequestCount: requests.count)
+            case let (.failure(error), _), let (_, .failure(error)):
+                state = .failed(error.localizedDescription)
             }
         }
     }
