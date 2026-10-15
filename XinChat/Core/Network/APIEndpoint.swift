@@ -1,7 +1,6 @@
 import Alamofire
 
 /// 描述一次 API 请求所需的路径、方法和参数。
-/// 新增接口时通过遵循该协议接入，无需修改底层 `NetworkClient`。
 protocol APIEndpoint {
     var path: String { get }
     var method: HTTPMethod { get }
@@ -13,10 +12,11 @@ extension APIEndpoint {
     var requiresAuthentication: Bool { true }
 }
 
-/// 认证模块接口集合。
+/// 认证模块接口集合（严格对齐 API.md 与扩展端点）。
 enum AuthAPI: APIEndpoint {
     case login(username: String, password: String)
-    case sendEmailCode(email: String)
+    case sendEmailLoginCode(email: String)
+    case sendRegisterCode(email: String)
     case loginByEmail(email: String, code: String)
     case register(email: String, code: String, password: String)
     case sendPasswordResetCode(email: String)
@@ -25,7 +25,8 @@ enum AuthAPI: APIEndpoint {
     var path: String {
         switch self {
         case .login: "/auth/login"
-        case .sendEmailCode: "/auth/register/code"
+        case .sendEmailLoginCode: "/auth/login/emailCode"
+        case .sendRegisterCode: "/auth/register/code"
         case .loginByEmail: "/auth/login/email"
         case .register: "/auth/register"
         case .sendPasswordResetCode: "/auth/password/code"
@@ -40,7 +41,7 @@ enum AuthAPI: APIEndpoint {
         switch self {
         case let .login(username, password):
             ["username": username, "password": password]
-        case let .sendEmailCode(email):
+        case let .sendEmailLoginCode(email), let .sendRegisterCode(email):
             ["email": email]
         case let .loginByEmail(email, code):
             ["email": email, "code": code]
@@ -54,11 +55,10 @@ enum AuthAPI: APIEndpoint {
     }
 }
 
-/// 通讯模块当前使用的接口集合。
+/// 通讯与好友模块接口集合（严格对齐 API.md）。
 enum ChatAPI {
     case friends
     case friendCandidates(keyword: String)
-    /// 发送好友申请。
     case sendFriendRequest(contactID: Int)
     case incomingFriendRequests
     case acceptFriendRequest(requestID: Int)
@@ -73,25 +73,25 @@ enum ChatAPI {
 extension ChatAPI: APIEndpoint {
     var path: String {
         switch self {
-        case .friends: "/friends"
-        case .friendCandidates: "/users/search"
-        case .sendFriendRequest: "/friend-requests"
-        case .incomingFriendRequests: "/friend-requests/incoming"
-        case let .acceptFriendRequest(requestID): "/friend-requests/\(requestID)/accept"
-        case let .rejectFriendRequest(requestID): "/friend-requests/\(requestID)/reject"
-        case .conversations: "/conversations"
-        case .createDirectConversation: "/conversations/direct"
-        case let .messages(conversationID): "/conversations/\(conversationID)/messages"
-        case let .sendMessage(conversationID, _): "/conversations/\(conversationID)/messages"
-        case let .markConversationRead(conversationID): "/conversations/\(conversationID)/read"
+        case .friends: "/contact/friends"
+        case .friendCandidates: "/contact/users/search"
+        case .sendFriendRequest: "/contact/friend-requests"
+        case .incomingFriendRequests: "/contact/friend-requests/incoming"
+        case let .acceptFriendRequest(requestID): "/contact/friend-requests/\(requestID)/accept"
+        case let .rejectFriendRequest(requestID): "/contact/friend-requests/\(requestID)/reject"
+        case .conversations: "/chat/session"
+        case .createDirectConversation: "/chat/conversation"
+        case .messages: "/chat/message/page"
+        case let .sendMessage(conversationID, _): "/chat/session/\(conversationID)/message"
+        case .markConversationRead: "/chat/message/read"
         }
     }
 
     var method: HTTPMethod {
         switch self {
-        case .friends, .friendCandidates, .incomingFriendRequests, .conversations, .messages: .get
+        case .friends, .friendCandidates, .incomingFriendRequests, .conversations: .get
         case .sendFriendRequest, .acceptFriendRequest, .rejectFriendRequest,
-             .createDirectConversation, .sendMessage, .markConversationRead: .post
+             .createDirectConversation, .messages, .sendMessage, .markConversationRead: .post
         }
     }
 
@@ -106,17 +106,22 @@ extension ChatAPI: APIEndpoint {
                 "addresseeId": contactID,
                 "message": "你好，我想添加你为好友"
             ]
-        case .incomingFriendRequests, .acceptFriendRequest, .rejectFriendRequest,
-             .markConversationRead:
+        case .incomingFriendRequests, .acceptFriendRequest, .rejectFriendRequest:
             nil
         case .conversations:
             nil
         case let .createDirectConversation(friendID):
             ["friendId": friendID]
-        case .messages:
-            ["limit": 50]
+        case let .messages(conversationID):
+            [
+                "sessionId": conversationID,
+                "page": 1,
+                "size": 50
+            ]
         case let .sendMessage(_, content):
             ["content": content]
+        case let .markConversationRead(conversationID):
+            ["ids": [conversationID]]
         }
     }
 }

@@ -18,8 +18,8 @@ enum ServerEnvironment: String, CaseIterable {
     /// 各环境对应的基础服务器地址
     var baseURL: URL {
         switch self {
-        case .dev:  return URL(string: "http://127.0.0.1:8080")!
-        case .stag: return URL(string: "http://192.168.31.111:8080")!
+        case .dev:  return URL(string: "http://111.231.53.205:8080")!
+        case .stag: return URL(string: "http://111.231.53.205:8080")!
         case .prod: return URL(string: "http://111.231.53.205:8080")!
         }
     }
@@ -55,7 +55,7 @@ enum AppEnvironment {
 
     /// REST API 根地址（自动追加版本前缀，随当前环境动态返回）
     static var apiBaseURL: URL {
-        current.baseURL.appending(path: "api/v1")
+        current.baseURL
     }
 
     /// WebSocket 实时通信地址（协议自动根据 http/https 切换为 ws/wss）

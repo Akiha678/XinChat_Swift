@@ -52,29 +52,58 @@ final class AuthRepository: AuthRepositoryProtocol {
         }
     }
 
+    /// 发送邮箱验证码（全自动适配：新用户发注册码，老用户发验证码，不强迫老用户改走密码）
     func sendEmailCode(
         email: String,
         completion: @escaping (Result<String, NetworkError>) -> Void
     ) {
+        // 第一优先级：尝试通用的邮箱登录发码接口
         networkClient.request(
-            AuthAPI.sendEmailCode(email: email),
+            AuthAPI.sendEmailLoginCode(email: email),
             responseType: GenericNetworkResponse<String>.self
-        ) { result in
+        ) { [weak self] result in
             switch result {
-            case let .success(response):
-                completion(.success(response.data ?? response.message ?? "验证码已发送"))
-            case let .failure(error):
-                completion(.failure(error))
+            case let .success(response) where response.code == 1000 || response.code == 200:
+                completion(.success(response.data ?? response.message ?? "验证码已发送到邮箱"))
+            default:
+                // 若服务端尚未部署通用发码端点，自适应平滑降级
+                self?.sendEmailCodeFallback(email: email, completion: completion)
             }
         }
     }
 
+    private func sendEmailCodeFallback(
+        email: String,
+        completion: @escaping (Result<String, NetworkError>) -> Void
+    ) {
+        networkClient.request(
+            AuthAPI.sendRegisterCode(email: email),
+            responseType: GenericNetworkResponse<String>.self
+        ) { [weak self] regResult in
+            switch regResult {
+            case let .success(response):
+                if response.code == 409 || response.message?.contains("已注册") == true {
+                    // 该邮箱已注册过：老用户同样需要验证码登录！自动通过邮箱验证码服务发送验证码
+                    self?.sendPasswordResetCode(email: email, completion: completion)
+                } else if let code = response.code, code != 1000 && code != 200 {
+                    completion(.failure(.server(statusCode: code, message: response.message ?? "发送失败")))
+                } else {
+                    completion(.success(response.data ?? response.message ?? "验证码已发送到邮箱"))
+                }
+            case .failure:
+                // 失败重试已注册通道
+                self?.sendPasswordResetCode(email: email, completion: completion)
+            }
+        }
+    }
+
+    /// 邮箱验证码登录（新用户未注册自动注册，已注册直接登录）
     func loginByEmail(
         email: String,
         code: String,
         completion: @escaping (Result<AuthenticatedSession, NetworkError>) -> Void
     ) {
-        // 先尝试调用服务端的邮箱验证码登录端点
+        // 请求服务端的邮箱验证码登录端点
         networkClient.request(
             AuthAPI.loginByEmail(email: email, code: code),
             responseType: LoginResponse.self
@@ -83,9 +112,8 @@ final class AuthRepository: AuthRepositoryProtocol {
             case let .success(response):
                 completion(.success(response.session))
             case let .failure(error):
-                // 如果服务端暂未提供 /auth/login/email（如返回 404 或 405），
-                // 优雅降级到自动注册（符合无注册页、自动注册产品逻辑）
                 if case let .server(statusCode, _) = error, statusCode == 404 || statusCode == 405 {
+                    // 服务端暂未部署 POST /auth/login/email 时的降级兜底
                     self?.fallbackAutoRegister(email: email, code: code, completion: completion)
                 } else {
                     completion(.failure(error))
@@ -99,19 +127,17 @@ final class AuthRepository: AuthRepositoryProtocol {
         code: String,
         completion: @escaping (Result<AuthenticatedSession, NetworkError>) -> Void
     ) {
-        // 自动注册：服务端如果已有邮箱会返回 409，未注册则自动注册并返回 session
         let autoPassword = UUID().uuidString
         networkClient.request(
             AuthAPI.register(email: email, code: code, password: autoPassword),
             responseType: LoginResponse.self
-        ) { [weak self] regResult in
+        ) { regResult in
             switch regResult {
             case let .success(response):
                 completion(.success(response.session))
             case let .failure(regError):
                 if case let .server(statusCode, msg) = regError, statusCode == 409 {
-                    // 该邮箱已注册过，提示使用密码登录
-                    completion(.failure(.server(statusCode: 409, message: "该邮箱已注册，请使用密码登录或找回密码")))
+                    completion(.failure(.server(statusCode: 409, message: "该邮箱为已注册账号，后端尚未配置老用户邮箱验证码直登接口（POST /auth/login/email），请先添加后端接口或使用密码登录")))
                 } else {
                     completion(.failure(regError))
                 }
@@ -129,7 +155,12 @@ final class AuthRepository: AuthRepositoryProtocol {
         ) { result in
             switch result {
             case let .success(response):
-                completion(.success(response.data ?? response.message ?? "验证码已发送"))
+                if let code = response.code, code != 1000 && code != 200 {
+                    let msg = response.message ?? "操作失败"
+                    completion(.failure(.server(statusCode: code, message: msg)))
+                } else {
+                    completion(.success(response.data ?? response.message ?? "验证码已发送到邮箱"))
+                }
             case let .failure(error):
                 completion(.failure(error))
             }
@@ -147,8 +178,13 @@ final class AuthRepository: AuthRepositoryProtocol {
             responseType: GenericNetworkResponse<Bool>.self
         ) { result in
             switch result {
-            case .success:
-                completion(.success(()))
+            case let .success(response):
+                if let code = response.code, code != 1000 && code != 200 {
+                    let msg = response.message ?? "重置失败"
+                    completion(.failure(.server(statusCode: code, message: msg)))
+                } else {
+                    completion(.success(()))
+                }
             case let .failure(error):
                 completion(.failure(error))
             }
