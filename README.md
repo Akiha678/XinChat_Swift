@@ -84,35 +84,27 @@ Repository Protocol
 
 ```text
 XinChat/
-├── App/
-│   ├── AppContainer.swift                 # 依赖注入与根页面组装
-│   ├── AppRootViewController.swift        # 登录页与主界面协调
-│   └── AppSession.swift                   # 当前用户会话
-├── Common/
-│   ├── Theme/AppTheme.swift               # 颜色与视觉令牌
-│   └── UI/
-│       ├── AppBarView.swift               # 通用顶部导航组件
-│       └── AvatarView.swift               # 通用头像组件
-├── Core/Network/
-│   ├── APIEndpoint.swift                  # Endpoint 协议与接口定义
-│   ├── NetworkClient.swift                # Alamofire 统一封装
-│   └── NetworkError.swift                 # 网络错误映射
-├── Core/Realtime/                          # WebSocket 连接与事件分发
-├── Core/Security/                          # Keychain 令牌存储
-├── Domain/
-│   ├── Models/                            # 登录与聊天领域模型
-│   └── Repositories/                      # 认证与聊天 Repository
-├── Presentation/
-│   ├── Login/                             # 用户名密码登录
-│   ├── Root/                              # 主 TabBar 与导航栈
-│   ├── ConversationList/                  # 会话列表模块
-│   ├── Chat/                              # 聊天详情模块
-│   ├── Contacts/                          # 联系人模块
-│   ├── AddFriend/                         # 搜索用户与发送好友申请
-│   ├── FriendRequests/                    # 收到的申请与同意/拒绝
-│   └── Profile/                           # 个人中心模块
-├── ContentView.swift                      # SwiftUI/UIKit 桥接
-└── XinChatApp.swift                       # 应用入口
+├── App/                                   # 应用装配、生命周期与启动入口
+│   ├── XinChatApp.swift                   # SwiftUI App 入口
+│   ├── ContentView.swift                  # SwiftUI / UIKit 桥接
+│   ├── AppContainer.swift                 # 依赖注入组合根 (Composition Root)
+│   ├── AppRootViewController.swift        # 根页面状态协调 (登录与主界面切换)
+│   ├── AppSession.swift                   # 全局用户会话与令牌状态
+│   └── Assets.xcassets                    # 应用图标与静态资源
+├── Core/                                  # 基础设施与通用底层共享层
+│   ├── Config/AppEnvironment.swift        # 多环境集中配置 (Dev/Staging/Prod)
+│   ├── Network/                           # 网络客户端封装与 API Endpoint
+│   ├── Realtime/                          # WebSocket 实时通信引擎
+│   ├── Security/                          # Keychain 硬件级安全存储
+│   ├── Models/                            # 全局领域实体模型 (Auth/Chat Models)
+│   ├── Repositories/                      # 数据仓库层 (Auth/Chat Repository)
+│   └── DesignSystem/                      # 统一设计系统 (Theme 主题令牌与公共 UI 组件)
+└── Feature/                               # 业务特性层 (标准 MVVM 模式)
+    ├── Root/                              # 主界面 TabBar 框架
+    ├── Auth/                              # 认证模块 (登录/验证码输入/找回密码)
+    ├── Chat/                              # 聊天会话与消息模块 (列表与详情)
+    ├── Contacts/                          # 通讯录、添加好友与好友申请
+    └── Profile/                           # 个人中心与资料设置
 ```
 
 ## 运行项目
