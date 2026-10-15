@@ -32,7 +32,9 @@ final class AppRootViewController: UIViewController {
             guard AppSession.signIn(session) else { return }
             self?.showMain(animated: true)
         }
-        replaceContent(with: login, animated: animated)
+        let nav = UINavigationController(rootViewController: login)
+        nav.setNavigationBarHidden(true, animated: false)
+        replaceContent(with: nav, animated: animated)
     }
 
     private func showMain(animated: Bool) {

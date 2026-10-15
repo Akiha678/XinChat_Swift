@@ -16,14 +16,40 @@ extension APIEndpoint {
 /// 认证模块接口集合。
 enum AuthAPI: APIEndpoint {
     case login(username: String, password: String)
+    case sendEmailCode(email: String)
+    case loginByEmail(email: String, code: String)
+    case register(email: String, code: String, password: String)
+    case sendPasswordResetCode(email: String)
+    case updatePassword(email: String, code: String, newPassword: String)
 
-    var path: String { "/auth/login" }
+    var path: String {
+        switch self {
+        case .login: "/auth/login"
+        case .sendEmailCode: "/auth/register/code"
+        case .loginByEmail: "/auth/login/email"
+        case .register: "/auth/register"
+        case .sendPasswordResetCode: "/auth/password/code"
+        case .updatePassword: "/auth/updatePassword"
+        }
+    }
+
     var method: HTTPMethod { .post }
     var requiresAuthentication: Bool { false }
+
     var parameters: Parameters? {
         switch self {
         case let .login(username, password):
             ["username": username, "password": password]
+        case let .sendEmailCode(email):
+            ["email": email]
+        case let .loginByEmail(email, code):
+            ["email": email, "code": code]
+        case let .register(email, code, password):
+            ["email": email, "code": code, "password": password]
+        case let .sendPasswordResetCode(email):
+            ["email": email]
+        case let .updatePassword(email, code, newPassword):
+            ["email": email, "code": code, "newPassword": newPassword]
         }
     }
 }

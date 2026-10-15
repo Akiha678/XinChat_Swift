@@ -1,20 +1,28 @@
 import SnapKit
 import UIKit
 
-/// 账号密码登录页面。
+/// 登录主页面（复刻小黑盒风格，支持验证码登录与密码登录切换，无显式注册页，未注册邮箱自动注册）
 final class LoginViewController: UIViewController {
     var onLoginSucceeded: ((AuthenticatedSession) -> Void)?
 
     private let viewModel: LoginViewModel
-    private let logoView = UIImageView()
+
+    // UI 组件
+    private let closeButton = UIButton(type: .system)
     private let titleLabel = UILabel()
-    private let subtitleLabel = UILabel()
-    private let formView = UIView()
-    private let usernameField = UITextField()
-    private let passwordField = UITextField()
-    private let loginButton = UIButton(type: .system)
+    private let emailField = UnderlineTextFieldView(placeholder: "输入邮箱", keyboardType: .emailAddress, returnKeyType: .next)
+    private let primaryButton = UIButton(type: .system)
     private let indicator = UIActivityIndicatorView(style: .medium)
-    private let testAccountLabel = UILabel()
+
+    // 辅助切换行
+    private let subActionsStack = UIStackView()
+    private let switchModeButton = UIButton(type: .system)
+    private let findAccountButton = UIButton(type: .system)
+
+    // 底部区域
+    private let agreementCheckboxView = AgreementCheckboxView()
+    private let thirdPartyLoginView = ThirdPartyLoginView()
+    private let brandFooterView = BrandFooterView()
 
     init(viewModel: LoginViewModel) {
         self.viewModel = viewModel
@@ -26,132 +34,294 @@ final class LoginViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
-        bind()
+        bindViewModel()
+        updateUI(for: viewModel.mode, animated: false)
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.setNavigationBarHidden(true, animated: animated)
     }
 
     private func setupUI() {
-        view.backgroundColor = AppTheme.background
-        logoView.image = UIImage(systemName: "message.fill")
-        logoView.tintColor = AppTheme.tint
-        logoView.contentMode = .scaleAspectFit
+        view.backgroundColor = AppTheme.authBackground
 
-        titleLabel.text = "XinChat"
-        titleLabel.font = .systemFont(ofSize: 34, weight: .bold)
-        titleLabel.textAlignment = .center
-        subtitleLabel.text = "登录后与好友保持联系"
-        subtitleLabel.textColor = AppTheme.secondaryText
-        subtitleLabel.textAlignment = .center
+        // 关闭按钮
+        let closeConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+        closeButton.setImage(UIImage(systemName: "xmark", withConfiguration: closeConfig), for: .normal)
+        closeButton.tintColor = .label
+        closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
 
-        formView.backgroundColor = .systemBackground
-        formView.layer.cornerRadius = 18
-        formView.layer.shadowColor = UIColor.black.cgColor
-        formView.layer.shadowOpacity = 0.06
-        formView.layer.shadowRadius = 14
-        formView.layer.shadowOffset = CGSize(width: 0, height: 6)
+        // 标题
+        titleLabel.font = .systemFont(ofSize: 28, weight: .bold)
+        titleLabel.textColor = .label
 
-        configure(field: usernameField, placeholder: "用户名", icon: "person")
-        usernameField.textContentType = .username
-        usernameField.autocapitalizationType = .none
-        usernameField.autocorrectionType = .no
-        usernameField.returnKeyType = .next
-        usernameField.delegate = self
-
-        configure(field: passwordField, placeholder: "密码", icon: "lock")
-        passwordField.textContentType = .password
-        passwordField.isSecureTextEntry = true
-        passwordField.returnKeyType = .go
-        passwordField.delegate = self
-
-        loginButton.setTitle("登录", for: .normal)
-        loginButton.setTitleColor(.white, for: .normal)
-        loginButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
-        loginButton.backgroundColor = AppTheme.tint
-        loginButton.layer.cornerRadius = 12
-        loginButton.addTarget(self, action: #selector(loginTapped), for: .touchUpInside)
-
-        testAccountLabel.text = "测试账号：admin1 / admin2　密码：123456"
-        testAccountLabel.font = .systemFont(ofSize: 13)
-        testAccountLabel.textColor = AppTheme.secondaryText
-        testAccountLabel.textAlignment = .center
-        testAccountLabel.numberOfLines = 0
-
-        [logoView, titleLabel, subtitleLabel, formView, loginButton, indicator, testAccountLabel].forEach(view.addSubview)
-        [usernameField, passwordField].forEach(formView.addSubview)
-
-        logoView.snp.makeConstraints {
-            $0.top.equalTo(view.safeAreaLayoutGuide).offset(54)
-            $0.centerX.equalToSuperview()
-            $0.size.equalTo(72)
+        // 邮箱输入框
+        emailField.onTextChanged = { [weak self] text in
+            self?.updatePrimaryButtonState(email: text)
         }
-        titleLabel.snp.makeConstraints { $0.top.equalTo(logoView.snp.bottom).offset(16); $0.centerX.equalToSuperview() }
-        subtitleLabel.snp.makeConstraints { $0.top.equalTo(titleLabel.snp.bottom).offset(8); $0.centerX.equalToSuperview() }
-        formView.snp.makeConstraints {
-            $0.top.equalTo(subtitleLabel.snp.bottom).offset(36)
+        emailField.onReturnPressed = { [weak self] in
+            self?.primaryButtonTapped()
+        }
+
+        // 主操作按钮
+        primaryButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
+        primaryButton.layer.cornerRadius = 8
+        primaryButton.clipsToBounds = true
+        primaryButton.addTarget(self, action: #selector(primaryButtonTapped), for: .touchUpInside)
+
+        // 辅助操作（切换登录方式、账号找回）
+        switchModeButton.titleLabel?.font = .systemFont(ofSize: 14)
+        switchModeButton.setTitleColor(UIColor.secondaryLabel, for: .normal)
+        switchModeButton.addTarget(self, action: #selector(switchModeTapped), for: .touchUpInside)
+
+        findAccountButton.setTitle("账号找回", for: .normal)
+        findAccountButton.titleLabel?.font = .systemFont(ofSize: 14)
+        findAccountButton.setTitleColor(UIColor.secondaryLabel, for: .normal)
+        findAccountButton.addTarget(self, action: #selector(findAccountTapped), for: .touchUpInside)
+
+        subActionsStack.axis = .horizontal
+        subActionsStack.distribution = .equalSpacing
+        subActionsStack.alignment = .center
+        subActionsStack.addArrangedSubview(switchModeButton)
+        subActionsStack.addArrangedSubview(findAccountButton)
+
+        // 用户协议
+        agreementCheckboxView.onCheckedChanged = { [weak self] checked in
+            self?.viewModel.isAgreementChecked = checked
+        }
+        agreementCheckboxView.onUserAgreementTapped = { [weak self] in
+            self?.openPolicy(type: .userAgreement)
+        }
+        agreementCheckboxView.onPrivacyPolicyTapped = { [weak self] in
+            self?.openPolicy(type: .privacyPolicy)
+        }
+
+        // 第三方登录
+        thirdPartyLoginView.onAppleLoginTapped = { [weak self] in
+            self?.showToast("暂未开放Apple登录，请使用邮箱登录")
+        }
+        thirdPartyLoginView.onWechatLoginTapped = { [weak self] in
+            self?.showToast("暂未开放微信登录，请使用邮箱登录")
+        }
+
+        [
+            closeButton,
+            titleLabel,
+            emailField,
+            primaryButton,
+            indicator,
+            subActionsStack,
+            agreementCheckboxView,
+            thirdPartyLoginView,
+            brandFooterView
+        ].forEach(view.addSubview)
+
+        layoutViews()
+
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        tapGesture.cancelsTouchesInView = false
+        view.addGestureRecognizer(tapGesture)
+    }
+
+    private func layoutViews() {
+        closeButton.snp.makeConstraints {
+            $0.top.equalTo(view.safeAreaLayoutGuide).offset(12)
+            $0.leading.equalToSuperview().offset(18)
+            $0.size.equalTo(36)
+        }
+
+        titleLabel.snp.makeConstraints {
+            $0.top.equalTo(closeButton.snp.bottom).offset(28)
             $0.leading.trailing.equalToSuperview().inset(28)
-            $0.height.equalTo(112)
         }
-        usernameField.snp.makeConstraints {
-            $0.top.leading.trailing.equalToSuperview()
-            $0.height.equalTo(56)
+
+        emailField.snp.makeConstraints {
+            $0.top.equalTo(titleLabel.snp.bottom).offset(36)
+            $0.leading.trailing.equalToSuperview().inset(28)
+            $0.height.equalTo(52)
         }
-        passwordField.snp.makeConstraints {
-            $0.top.equalTo(usernameField.snp.bottom)
-            $0.leading.trailing.bottom.equalToSuperview()
+
+        primaryButton.snp.makeConstraints {
+            $0.top.equalTo(emailField.snp.bottom).offset(32)
+            $0.leading.trailing.equalToSuperview().inset(28)
+            $0.height.equalTo(48)
         }
-        loginButton.snp.makeConstraints {
-            $0.top.equalTo(formView.snp.bottom).offset(22)
-            $0.leading.trailing.equalTo(formView)
-            $0.height.equalTo(50)
+
+        indicator.snp.makeConstraints {
+            $0.center.equalTo(primaryButton)
         }
-        indicator.snp.makeConstraints { $0.center.equalTo(loginButton) }
-        testAccountLabel.snp.makeConstraints {
-            $0.top.equalTo(loginButton.snp.bottom).offset(18)
-            $0.leading.trailing.equalTo(formView)
+
+        subActionsStack.snp.makeConstraints {
+            $0.top.equalTo(primaryButton.snp.bottom).offset(18)
+            $0.leading.trailing.equalToSuperview().inset(28)
+        }
+
+        brandFooterView.snp.makeConstraints {
+            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-16)
+            $0.centerX.equalToSuperview()
+        }
+
+        thirdPartyLoginView.snp.makeConstraints {
+            $0.bottom.equalTo(brandFooterView.snp.top).offset(-24)
+            $0.leading.trailing.equalToSuperview().inset(28)
+            $0.height.equalTo(44)
+        }
+
+        agreementCheckboxView.snp.makeConstraints {
+            $0.bottom.equalTo(thirdPartyLoginView.snp.top).offset(-20)
+            $0.centerX.equalToSuperview()
+            $0.leading.greaterThanOrEqualToSuperview().offset(20)
+            $0.trailing.lessThanOrEqualToSuperview().offset(-20)
         }
     }
 
-    private func configure(field: UITextField, placeholder: String, icon: String) {
-        field.placeholder = placeholder
-        field.font = .systemFont(ofSize: 16)
-        let imageView = UIImageView(image: UIImage(systemName: icon))
-        imageView.tintColor = AppTheme.secondaryText
-        imageView.contentMode = .center
-        imageView.frame = CGRect(x: 0, y: 0, width: 48, height: 48)
-        field.leftView = imageView
-        field.leftViewMode = .always
-        field.layer.borderColor = UIColor.separator.cgColor
-        field.layer.borderWidth = 0.5
-    }
+    private func bindViewModel() {
+        viewModel.onModeChanged = { [weak self] mode in
+            self?.updateUI(for: mode, animated: true)
+        }
 
-    private func bind() {
         viewModel.onLoadingChanged = { [weak self] loading in
-            self?.loginButton.isEnabled = !loading
-            self?.loginButton.setTitle(loading ? nil : "登录", for: .normal)
+            self?.primaryButton.isEnabled = !loading
+            self?.primaryButton.setTitle(loading ? nil : self?.viewModel.mode.primaryButtonTitle, for: .normal)
             loading ? self?.indicator.startAnimating() : self?.indicator.stopAnimating()
         }
-        viewModel.onError = { [weak self] message in self?.showError(message) }
-        viewModel.onLoginSucceeded = { [weak self] user in self?.onLoginSucceeded?(user) }
+
+        viewModel.onError = { [weak self] message in
+            self?.showError(message)
+        }
+
+        viewModel.onToast = { [weak self] message in
+            self?.showToast(message)
+        }
+
+        viewModel.onLoginSucceeded = { [weak self] session in
+            self?.onLoginSucceeded?(session)
+        }
     }
 
-    @objc private func loginTapped() {
+    private func updateUI(for mode: LoginMode, animated: Bool) {
+        let updateBlock = {
+            self.titleLabel.text = mode.title
+            self.primaryButton.setTitle(mode.primaryButtonTitle, for: .normal)
+            self.switchModeButton.setTitle(mode.switchModeTitle, for: .normal)
+            self.updatePrimaryButtonState(email: self.emailField.text)
+        }
+
+        if animated {
+            UIView.transition(with: titleLabel, duration: 0.2, options: .transitionCrossDissolve, animations: updateBlock)
+        } else {
+            updateBlock()
+        }
+    }
+
+    private func updatePrimaryButtonState(email: String) {
+        let isReady = viewModel.isValidEmail(email)
+        primaryButton.isEnabled = isReady
+        primaryButton.backgroundColor = isReady ? AppTheme.authPrimaryButton : AppTheme.authDisabledButton
+        primaryButton.setTitleColor(isReady ? AppTheme.authPrimaryButtonText : AppTheme.authDisabledButtonText, for: .normal)
+    }
+
+    @objc private func dismissKeyboard() {
         view.endEditing(true)
-        viewModel.login(username: usernameField.text, password: passwordField.text)
+    }
+
+    @objc private func closeTapped() {
+        dismissKeyboard()
+        if let nav = navigationController, nav.viewControllers.count > 1 {
+            nav.popViewController(animated: true)
+        } else if presentingViewController != nil {
+            dismiss(animated: true)
+        } else {
+            showToast("请完成登录以继续使用")
+        }
+    }
+
+    @objc private func switchModeTapped() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+        viewModel.toggleMode()
+    }
+
+    @objc private func findAccountTapped() {
+        dismissKeyboard()
+        let resetVC = ResetPasswordViewController(
+            repository: viewModel.repository,
+            email: emailField.text
+        )
+        navigateOrPresent(resetVC)
+    }
+
+    @objc private func primaryButtonTapped() {
+        dismissKeyboard()
+        let email = emailField.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard viewModel.isValidEmail(email) else {
+            showError("请输入有效的邮箱地址")
+            return
+        }
+
+        // 验证码登录流程必须先勾选协议（符合图2中的协议勾选设计）
+        if viewModel.mode == .verificationCode && !viewModel.isAgreementChecked {
+            agreementCheckboxView.shake()
+            showToast("请先阅读并同意用户协议和隐私政策")
+            return
+        }
+
+        switch viewModel.mode {
+        case .verificationCode:
+            // 验证码登录：发送验证码后进入输入验证码界面
+            viewModel.sendCode(email: email) { [weak self] success in
+                guard success, let self else { return }
+                let verifyVC = VerifyCodeInputViewController(email: email, repository: self.viewModel.repository)
+                verifyVC.onLoginSucceeded = { [weak self] session in
+                    self?.onLoginSucceeded?(session)
+                }
+                self.navigateOrPresent(verifyVC)
+            }
+
+        case .password:
+            // 密码登录：点击下一步进入输入密码界面
+            let passwordVC = PasswordInputViewController(account: email, repository: viewModel.repository)
+            passwordVC.onLoginSucceeded = { [weak self] session in
+                self?.onLoginSucceeded?(session)
+            }
+            passwordVC.onSwitchToVerifyCode = { [weak self] in
+                self?.viewModel.toggleMode()
+            }
+            passwordVC.onFindAccount = { [weak self] in
+                self?.findAccountTapped()
+            }
+            navigateOrPresent(passwordVC)
+        }
+    }
+
+    private func navigateOrPresent(_ vc: UIViewController) {
+        if let nav = navigationController {
+            nav.pushViewController(vc, animated: true)
+        } else {
+            let nav = UINavigationController(rootViewController: vc)
+            nav.modalPresentationStyle = .fullScreen
+            present(nav, animated: true)
+        }
+    }
+
+    private func openPolicy(type: PolicyWebViewController.PolicyType) {
+        let policyVC = PolicyWebViewController(type: type)
+        policyVC.modalPresentationStyle = .pageSheet
+        present(policyVC, animated: true)
+    }
+
+    private func showToast(_ message: String) {
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        present(alert, animated: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            alert.dismiss(animated: true)
+        }
     }
 
     private func showError(_ message: String) {
-        let alert = UIAlertController(title: "登录失败", message: message, preferredStyle: .alert)
+        let alert = UIAlertController(title: "提示", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "知道了", style: .default))
         present(alert, animated: true)
-    }
-}
-
-extension LoginViewController: UITextFieldDelegate {
-    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        if textField === usernameField {
-            passwordField.becomeFirstResponder()
-        } else {
-            loginTapped()
-        }
-        return true
     }
 }

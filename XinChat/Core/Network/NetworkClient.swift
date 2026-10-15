@@ -15,15 +15,19 @@ protocol NetworkClientProtocol {
 /// 负责 URL 组装、参数编码、状态码校验、JSON 解码和错误映射。
 final class NetworkClient: NetworkClientProtocol {
     private struct ServerErrorBody: Decodable { let message: String? }
-    private let baseURL: URL
+    private let customBaseURL: URL?
     private let session: Session
 
+    /// 动态获取当前激活的 Base URL（未指定 customBaseURL 时实时跟随 AppEnvironment.apiBaseURL）
+    private var activeBaseURL: URL {
+        customBaseURL ?? AppEnvironment.apiBaseURL
+    }
+
     init(
-        // iOS 模拟器默认连接本机 Spring Boot；真机调试时应替换为开发机局域网地址。
-        baseURL: URL = AppEnvironment.apiBaseURL,
+        baseURL: URL? = nil,
         session: Session = .default
     ) {
-        self.baseURL = baseURL
+        self.customBaseURL = baseURL
         self.session = session
     }
 
@@ -32,7 +36,7 @@ final class NetworkClient: NetworkClientProtocol {
         responseType: T.Type,
         completion: @escaping (Result<T, NetworkError>) -> Void
     ) {
-        let url = baseURL.appending(path: endpoint.path)
+        let url = activeBaseURL.appending(path: endpoint.path)
         var headers = HTTPHeaders()
         if endpoint.requiresAuthentication, let token = AppSession.accessToken {
             headers.add(.authorization(bearerToken: token))

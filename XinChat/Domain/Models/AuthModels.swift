@@ -39,3 +39,13 @@ struct AuthenticatedSession: Equatable {
     let accessToken: String
     let expiresAt: String
 }
+
+/// 通用网络响应包装模型，兼容带包装或裸响应
+struct GenericNetworkResponse<T: Decodable>: Decodable {
+    let code: Int?
+    let message: String?
+    let data: T?
+}
+
+/// 任意内容可解码的占位响应
+struct EmptyResponse: Decodable {}
